@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>New Delta Air International Aviation Academy — Flight Booking</title>
+<title>Delta Air International Aviation Academy — Flight Booking</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 :root{
@@ -100,6 +100,13 @@ body{
 
 .req-list{display:flex;flex-direction:column;gap:10px;}
 .req-card{border:1px solid var(--line);padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+details.req-card{padding:0;}
+details.req-card summary{cursor:pointer;padding:12px 14px;list-style:none;}
+details.req-card summary::-webkit-details-marker{display:none;}
+details.req-card summary::before{content:"\25B8  ";color:#888;}
+details.req-card[open] summary::before{content:"\25BE  ";}
+details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid var(--line);margin-top:10px;padding-top:10px;}
+.archive-table th, .archive-table td{padding:12px 16px;}
 .req-card.pending-card{border-left:5px solid var(--warn);}
 .req-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
 .req-info{font-size:0.88rem;}
@@ -295,8 +302,13 @@ body{
     </div>
 
     <div class="panel requires-approved-profile hidden">
-      <h2>Your Flights</h2>
-      <div class="req-list" id="my-requests"></div>
+      <div class="student-list-toggle-wrap">
+        <a href="#" id="toggle-my-flights" class="student-list-link">View my flight history &rarr;</a>
+      </div>
+      <div class="hidden" id="my-flights-panel">
+        <h2>Your Flights</h2>
+        <div class="req-list" id="my-requests"></div>
+      </div>
     </div>
 
     <div class="panel">
@@ -340,6 +352,10 @@ body{
             </div>
             <button class="btn small warn-btn" id="mark-aog-btn">Mark unavailable</button>
           </div>
+          <div class="field hidden" id="aog-slots-field">
+            <label>Maintenance for specific slots only (leave all unchecked for the whole day)</label>
+            <div id="aog-slots-checkboxes" style="display:flex;gap:14px;flex-wrap:wrap;"></div>
+          </div>
           <div class="req-list" id="aog-active-list"></div>
         </div>
       </div>
@@ -380,7 +396,7 @@ body{
           </div>
           <button class="btn small secondary" id="archive-show-all">Show all months</button>
         </div>
-        <table class="avail-table" id="archive-table"></table>
+        <table class="avail-table archive-table" id="archive-table"></table>
       </div>
 
       <div class="panel">
@@ -482,6 +498,25 @@ function tailsForType(type){
 function aogFor(date, aircraft){
   return aogEntries.find(a => a.date === date && a.aircraft === aircraft) || null;
 }
+// Whole-day block: AOG always, or Maintenance with no specific slots chosen
+function aogWholeDay(date, aircraft){
+  const a = aogFor(date, aircraft);
+  if(!a) return null;
+  if(a.reason === 'AOG') return a;
+  if(a.reason === 'MAINTENANCE' && (!a.slots || a.slots.length === 0)) return a;
+  return null;
+}
+// Does an AOG/Maintenance entry block this specific slot?
+function aogBlocksSlot(date, aircraft, slotId){
+  const a = aogFor(date, aircraft);
+  if(!a) return null;
+  if(a.reason === 'AOG') return a;
+  if(a.reason === 'MAINTENANCE'){
+    if(!a.slots || a.slots.length === 0) return a; // whole day maintenance
+    return a.slots.includes(slotId) ? a : null;
+  }
+  return null;
+}
 
 function setConnBanner(ok, msg){
   const el = document.getElementById('conn-banner');
@@ -525,12 +560,13 @@ onSnapshot(aogCol, snap => {
   renderAll();
 }, err => { console.error(err); });
 
-async function markAOG(date, aircraft, reason){
+async function markAOG(date, aircraft, reason, slots){
+  const payload = { date, aircraft, reason, slots: (reason === 'MAINTENANCE' ? (slots || []) : []) };
   const existing = aogEntries.find(a => a.date === date && a.aircraft === aircraft);
   if(existing){
-    await updateDoc(doc(db, 'aog_status', existing.id), { reason });
+    await updateDoc(doc(db, 'aog_status', existing.id), payload);
   } else {
-    await addDoc(aogCol, { date, aircraft, reason });
+    await addDoc(aogCol, payload);
   }
 }
 async function clearAOG(entryId){
@@ -590,18 +626,18 @@ function generateClearanceText(r){
 function statusTagHtml(status){ return `<span class="status-tag ${status}">${status.toUpperCase()}</span>`; }
 
 function buildAssignOptions(req){
-  const tails = tailsForType(req.aircraftType).filter(tail => !aogFor(req.date, tail));
+  const allTails = tailsForType(req.aircraftType);
   const options = [];
   if(req.wantsReserve){
-    tails.forEach(tail => {
+    allTails.filter(tail => !aogWholeDay(req.date, tail)).forEach(tail => {
       if(reserveCountFor(req.date, tail) < CAP_RESERVE){
         options.push({ value: tail + '|reserve', label: `${tail} — Reserve` });
       }
     });
   } else {
-    tails.forEach(tail => {
+    allTails.forEach(tail => {
       SLOTS.filter(s => !s.isLunch).forEach(s => {
-        if(!slotTaken(req.date, tail, s.id)){
+        if(!slotTaken(req.date, tail, s.id) && !aogBlocksSlot(req.date, tail, s.id)){
           options.push({ value: tail + '|' + s.id, label: `${tail} — ${s.label} (${s.time})` });
         }
       });
@@ -670,13 +706,16 @@ function renderInlineAvailability(){
   if(!type || !date){ el.innerHTML = ''; return; }
   const tails = tailsForType(type);
   el.innerHTML = tails.map(tail => {
-    const aog = aogFor(date, tail);
-    if(aog){
-      return `<div class="inline-avail-row"><b>${tail}</b> <span class="avail-badge full">${aog.reason}</span></div>`;
+    const whole = aogWholeDay(date, tail);
+    if(whole){
+      return `<div class="inline-avail-row"><b>${tail}</b> <span class="avail-badge full">${whole.reason} (whole day)</span></div>`;
     }
-    const remaining = CAP_MAIN - mainCountFor(date, tail);
+    const openSlots = SLOTS.filter(s => !s.isLunch).filter(s => !slotTaken(date, tail, s.id) && !aogBlocksSlot(date, tail, s.id));
+    const remaining = openSlots.length;
     const cls = remaining <= 0 ? 'full' : (remaining === 1 ? 'low' : 'open');
-    const label = remaining <= 0 ? 'Full' : `${remaining} of ${CAP_MAIN} slots open`;
+    const aogEntry = aogFor(date, tail);
+    const note = (aogEntry && aogEntry.reason === 'MAINTENANCE') ? ` — Maintenance: ${aogEntry.slots.map(id => slotInfo(id).label).join(', ')}` : '';
+    const label = (remaining <= 0 ? 'Full' : `${remaining} of ${CAP_MAIN} slots open`) + note;
     return `<div class="inline-avail-row"><b>${tail}</b> <span class="avail-badge ${cls}">${label}</span></div>`;
   }).join('');
 }
@@ -701,21 +740,23 @@ function renderMyRequests(){
   el.innerHTML = mine.map(r => {
     const s = r.slot ? slotInfo(r.slot) : null;
     return `
-    <div class="req-card">
-      <div class="req-header">
+    <details class="req-card">
+      <summary class="req-header">
         <div class="req-info">
           <b>${escapeHtml(r.date)}</b> — ${escapeHtml(r.aircraftType)} · ${escapeHtml(r.flightType)}
           ${r.isReserve ? '<div class="reserve-tag">RESERVE</div>' : ''}
-          <div class="req-meta">
-            Route: ${escapeHtml(r.flightRoute || '-')}<br>
-            Aircraft: ${r.aircraft ? escapeHtml(r.aircraft) : 'Pending assignment'}${s ? ' · ' + escapeHtml(s.label) : ''}<br>
-            Instructor: ${r.instructor ? escapeHtml(r.instructor) : 'None assigned'}
-          </div>
         </div>
         ${statusTagHtml(r.status)}
+      </summary>
+      <div class="req-details-body">
+        <div class="req-meta">
+          Route: ${escapeHtml(r.flightRoute || '-')}<br>
+          Aircraft: ${r.aircraft ? escapeHtml(r.aircraft) : 'Pending assignment'}${s ? ' · ' + escapeHtml(s.label) : ''}<br>
+          Instructor: ${r.instructor ? escapeHtml(r.instructor) : 'None assigned'}
+        </div>
+        ${r.status === 'approved' ? `<div class="clearance-box">${escapeHtml(generateClearanceText(r))}</div>` : ''}
       </div>
-      ${r.status === 'approved' ? `<div class="clearance-box">${escapeHtml(generateClearanceText(r))}</div>` : ''}
-    </div>`;
+    </details>`;
   }).join('');
 }
 
@@ -731,7 +772,7 @@ function renderScheduleBoard(containerEl, date, editable){
     }
     let cells = '';
     AIRCRAFT.forEach(tail => {
-      const aog = aogFor(date, tail);
+      const aog = aogBlocksSlot(date, tail, slot.id);
       if(aog){
         cells += `<td class="slot-aog">${aog.reason}</td>`;
         return;
@@ -750,7 +791,7 @@ function renderScheduleBoard(containerEl, date, editable){
 
   let reserveCells = '';
   AIRCRAFT.forEach(tail => {
-    const aog = aogFor(date, tail);
+    const aog = aogWholeDay(date, tail);
     if(aog){ reserveCells += `<td class="slot-aog">${aog.reason}</td>`; return; }
     const reserveForTail = approved.filter(x => x.aircraft === tail && x.isReserve);
     reserveCells += reserveForTail.length
@@ -881,24 +922,26 @@ function renderAllRequests(){
     const canCancel = r.status === 'approved';
     const s = r.slot ? slotInfo(r.slot) : null;
     return `
-    <div class="req-card">
-      <div class="req-header">
+    <details class="req-card">
+      <summary class="req-header">
         <div class="req-info">
           <b>${escapeHtml(r.name)}</b> — ${escapeHtml(r.license)} · ${escapeHtml(r.aircraftType)} · ${escapeHtml(r.date)}
           ${r.isReserve && r.status === 'approved' ? '<div class="reserve-tag">RESERVE</div>' : ''}
-          <div class="req-meta">Aircraft: ${r.aircraft || 'None'} ${s ? '· ' + escapeHtml(s.label) : ''} · Instructor: ${r.instructor || 'None'}</div>
         </div>
         ${statusTagHtml(r.status)}
+      </summary>
+      <div class="req-details-body">
+        <div class="req-meta">Aircraft: ${r.aircraft || 'None'} ${s ? '· ' + escapeHtml(s.label) : ''} · Instructor: ${r.instructor || 'None'}</div>
+        ${r.status === 'approved' ? `
+          <div class="clearance-box">${escapeHtml(generateClearanceText(r))}</div>
+          <div class="admin-actions">
+            <button class="btn small secondary copy-btn" data-text="${escapeHtml(generateClearanceText(r))}">Copy Clearance Text</button>
+            ${canPromote ? `<button class="btn small warn-btn promote-btn" data-id="${r.id}">Promote to main slot</button>` : ''}
+            ${canCancel ? `<button class="btn small grey-btn cancel-btn" data-id="${r.id}">Cancel flight</button>` : ''}
+          </div>
+        ` : ''}
       </div>
-      ${r.status === 'approved' ? `
-        <div class="clearance-box">${escapeHtml(generateClearanceText(r))}</div>
-        <div class="admin-actions">
-          <button class="btn small secondary copy-btn" data-text="${escapeHtml(generateClearanceText(r))}">Copy Clearance Text</button>
-          ${canPromote ? `<button class="btn small warn-btn promote-btn" data-id="${r.id}">Promote to main slot</button>` : ''}
-          ${canCancel ? `<button class="btn small grey-btn cancel-btn" data-id="${r.id}">Cancel flight</button>` : ''}
-        </div>
-      ` : ''}
-    </div>`;
+    </details>`;
   }).join('');
 
   el.querySelectorAll('.copy-btn').forEach(btn => {
@@ -973,12 +1016,17 @@ function renderAogActiveList(){
   const date = document.getElementById('schedule-date-admin').value;
   const forDate = aogEntries.filter(a => a.date === date);
   if(!forDate.length){ el.innerHTML = '<div class="empty">No aircraft marked AOG/Maintenance for this date.</div>'; return; }
-  el.innerHTML = forDate.map(a => `
+  el.innerHTML = forDate.map(a => {
+    const slotNote = (a.reason === 'MAINTENANCE' && a.slots && a.slots.length)
+      ? ` (${a.slots.map(id => slotInfo(id).label).join(', ')} only)`
+      : ' (whole day)';
+    return `
     <div class="req-card">
-      <div class="req-info"><b>${escapeHtml(a.aircraft)}</b> — ${escapeHtml(a.reason)}</div>
+      <div class="req-info"><b>${escapeHtml(a.aircraft)}</b> — ${escapeHtml(a.reason)}${slotNote}</div>
       <button class="btn small secondary clear-aog-btn" data-id="${a.id}">Clear</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
   el.querySelectorAll('.clear-aog-btn').forEach(btn => {
     btn.addEventListener('click', async () => { await clearAOG(btn.dataset.id); });
   });
@@ -1156,12 +1204,23 @@ document.getElementById('toggle-student-list').addEventListener('click', (e) => 
   e.preventDefault();
   document.getElementById('student-list-panel').classList.toggle('hidden');
 });
+document.getElementById('toggle-my-flights').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('my-flights-panel').classList.toggle('hidden');
+});
+document.getElementById('aog-reason-select').addEventListener('change', (e) => {
+  document.getElementById('aog-slots-field').classList.toggle('hidden', e.target.value !== 'MAINTENANCE');
+});
 document.getElementById('mark-aog-btn').addEventListener('click', async () => {
   const aircraft = document.getElementById('aog-aircraft-select').value;
   const reason = document.getElementById('aog-reason-select').value;
   const date = document.getElementById('schedule-date-admin').value;
   if(!aircraft || !date) return;
-  await markAOG(date, aircraft, reason);
+  let slots = [];
+  if(reason === 'MAINTENANCE'){
+    slots = Array.from(document.querySelectorAll('#aog-slots-checkboxes input:checked')).map(cb => cb.value);
+  }
+  await markAOG(date, aircraft, reason, slots);
 });
 document.getElementById('archive-month').addEventListener('change', renderArchive);
 document.getElementById('archive-show-all').addEventListener('click', () => {
@@ -1223,6 +1282,9 @@ document.getElementById('schedule-date-student').value = todayStr();
 document.getElementById('req-route-cc').innerHTML = '<option value="">Select…</option>' +
   CROSS_COUNTRY_ROUTES.map(r => `<option value="${r.route}">${r.route}${r.note ? ' (' + r.note + ')' : ''} — ${r.cap} slots/day</option>`).join('');
 document.getElementById('aog-aircraft-select').innerHTML = AIRCRAFT.map(t => `<option value="${t}">${t}</option>`).join('');
+document.getElementById('aog-slots-checkboxes').innerHTML = SLOTS.filter(s => !s.isLunch).map(s =>
+  `<label style="font-weight:400;font-size:0.85rem;"><input type="checkbox" value="${s.id}" style="width:auto;"/> ${s.label} (${s.time})</label>`
+).join('');
 loadMyProfilePointer();
 renderWeatherWidgets();
 </script>
