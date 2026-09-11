@@ -55,6 +55,13 @@ body{
 }
 .conn-banner.ok{background:var(--good-bg);color:var(--good);}
 .conn-banner.err{background:var(--bad-bg);color:var(--bad);}
+.active-users-badge{
+  font-size:0.78rem;
+  padding:4px 12px;
+  margin-bottom:10px;
+  text-align:center;
+  color:#555;
+}
 
 .tabs{display:flex;gap:2px;margin-bottom:14px;}
 .tabs button{flex:1;padding:12px;border:2px solid var(--maroon-dark);background:var(--grey-light);font-family:inherit;font-size:0.95rem;font-weight:700;cursor:pointer;}
@@ -193,6 +200,7 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
   </div>
 
   <div id="conn-banner" class="conn-banner">Connecting to database…</div>
+  <div class="active-users-badge">🟢 <span class="active-users-count">–</span> active now</div>
 
   <div class="tabs">
     <button id="tab-student" class="active">Book a Flight</button>
@@ -247,6 +255,12 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
           <button type="button" class="btn small secondary" id="switch-profile-btn">Not you? Switch profile</button>
         </div>
         <div id="status-banner-area"></div>
+        <div class="student-list-toggle-wrap">
+          <a href="#" id="toggle-flight-history" class="student-list-link">View flight history &rarr;</a>
+        </div>
+        <div class="hidden" id="flight-history-panel">
+          <div class="req-list" id="flight-history-list"></div>
+        </div>
       </div>
     </div>
 
@@ -302,13 +316,8 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
     </div>
 
     <div class="panel requires-approved-profile hidden">
-      <div class="student-list-toggle-wrap">
-        <a href="#" id="toggle-my-flights" class="student-list-link">View my flight history &rarr;</a>
-      </div>
-      <div class="hidden" id="my-flights-panel">
-        <h2>Your Flights</h2>
-        <div class="req-list" id="my-requests"></div>
-      </div>
+      <h2>My Requests</h2>
+      <div class="req-list" id="my-requests"></div>
     </div>
 
     <div class="panel">
@@ -394,7 +403,7 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
             <label>Filter by month</label>
             <input type="month" id="archive-month" />
           </div>
-          <button class="btn small secondary" id="archive-show-all">Show all months</button>
+          <button class="btn small secondary" id="archive-show-all">Back to current week</button>
         </div>
         <table class="avail-table archive-table" id="archive-table"></table>
       </div>
@@ -429,6 +438,7 @@ const requestsCol = collection(db, 'requests');
 const studentsCol = collection(db, 'students');
 const instructorsDocRef = doc(db, 'config', 'instructors');
 const aogCol = collection(db, 'aog_status');
+const presenceCol = collection(db, 'presence');
 
 const AIRCRAFT = ["775", "347", "2727", "1511", "6897", "SIMULATOR"];
 const C152_TAILS = ["775", "347", "1511", "6897"];
@@ -470,6 +480,7 @@ function routeCountFor(date, route){
 let requests = [];
 let students = [];
 let aogEntries = [];
+let presenceEntries = [];
 let currentProfile = null;
 let calendarViewDate = null;
 let instructors = [
@@ -559,6 +570,30 @@ onSnapshot(aogCol, snap => {
   aogEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderAll();
 }, err => { console.error(err); });
+
+// --- Presence / active-users tracking ---
+const mySessionId = 'sess-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const PRESENCE_ACTIVE_WINDOW_MS = 60000; // count a session as "active" if seen in the last 60s
+
+async function heartbeat(){
+  try{
+    await setDoc(doc(db, 'presence', mySessionId), { lastSeen: new Date().toISOString() });
+  }catch(e){ /* best-effort, ignore failures */ }
+}
+heartbeat();
+setInterval(heartbeat, 20000);
+
+onSnapshot(presenceCol, snap => {
+  presenceEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderActiveCount();
+}, err => { console.error(err); });
+
+function renderActiveCount(){
+  const cutoff = Date.now() - PRESENCE_ACTIVE_WINDOW_MS;
+  const activeCount = presenceEntries.filter(p => new Date(p.lastSeen).getTime() > cutoff).length;
+  document.querySelectorAll('.active-users-count').forEach(el => { el.textContent = activeCount; });
+}
+setInterval(renderActiveCount, 15000); // keep the count fresh even without new snapshot events
 
 async function markAOG(date, aircraft, reason, slots){
   const payload = { date, aircraft, reason, slots: (reason === 'MAINTENANCE' ? (slots || []) : []) };
@@ -760,6 +795,34 @@ function renderMyRequests(){
   }).join('');
 }
 
+function renderFlightHistory(){
+  const el = document.getElementById('flight-history-list');
+  if(!currentProfile || currentProfile.status !== 'approved'){ el.innerHTML = ''; return; }
+  const approvedOnly = requests.filter(r => r.studentProfileId === currentProfile.id && r.status === 'approved').sort((a,b) => b.date.localeCompare(a.date));
+  if(!approvedOnly.length){ el.innerHTML = '<div class="empty">No approved flights yet.</div>'; return; }
+  el.innerHTML = approvedOnly.map(r => {
+    const s = r.slot ? slotInfo(r.slot) : null;
+    return `
+    <details class="req-card">
+      <summary class="req-header">
+        <div class="req-info">
+          <b>${escapeHtml(r.date)}</b> — ${escapeHtml(r.aircraftType)} · ${escapeHtml(r.flightType)}
+          ${r.isReserve ? '<div class="reserve-tag">RESERVE</div>' : ''}
+        </div>
+        ${statusTagHtml(r.status)}
+      </summary>
+      <div class="req-details-body">
+        <div class="req-meta">
+          Route: ${escapeHtml(r.flightRoute || '-')}<br>
+          Aircraft: ${escapeHtml(r.aircraft || '-')}${s ? ' · ' + escapeHtml(s.label) : ''}<br>
+          Instructor: ${r.instructor ? escapeHtml(r.instructor) : 'None assigned'}
+        </div>
+        <div class="clearance-box">${escapeHtml(generateClearanceText(r))}</div>
+      </div>
+    </details>`;
+  }).join('');
+}
+
 function renderScheduleBoard(containerEl, date, editable){
   if(!date){ containerEl.innerHTML = ''; return; }
   const approved = requests.filter(r => r.date === date && r.status === 'approved');
@@ -851,10 +914,18 @@ function renderPending(){
   const pending = requests.filter(r => r.status === 'pending').sort((a,b) => a.date.localeCompare(b.date));
   if(!pending.length){ el.innerHTML = '<div class="empty">No pending requests.</div>'; return; }
   el.innerHTML = pending.map(r => {
+    const isCC = r.flightType === 'Cross Country';
     const options = buildAssignOptions(r);
-    const routeFull = r.flightType === 'Cross Country' && routeCountFor(r.date, r.flightRoute) >= routeCap(r.flightRoute);
+    const routeFull = isCC && routeCountFor(r.date, r.flightRoute) >= routeCap(r.flightRoute);
     const disabledApprove = options.length === 0 || routeFull;
     const optionsHtml = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('') || '<option>No slots available</option>';
+
+    // Cross Country: single-click approve, auto-assigns aircraft/slot within route capacity.
+    // Local: dispatcher manually picks the exact aircraft/slot combo.
+    const assignControlHtml = isCC
+      ? ''
+      : `<select data-id="${r.id}" class="assign-select" ${disabledApprove ? 'disabled' : ''}>${optionsHtml}</select>`;
+
     return `
       <div class="req-card pending-card">
         <div class="req-header">
@@ -870,12 +941,12 @@ function renderPending(){
             <option value="">Select Instructor (required)</option>
             ${renderInstructorDropdownOptions()}
           </select>
-          <select data-id="${r.id}" class="assign-select" ${disabledApprove ? 'disabled' : ''}>${optionsHtml}</select>
+          ${assignControlHtml}
         </div>
         <div class="decision-row">
           <button class="btn approve approve-btn" data-id="${r.id}" ${disabledApprove ? 'disabled' : ''}>&#10003; Approve</button>
           <button class="btn reject reject-btn" data-id="${r.id}">&#10005; Reject</button>
-          <div class="decision-note">Final decision — the student sees it immediately. An instructor must be selected to approve.</div>
+          <div class="decision-note">${isCC ? 'Cross Country auto-assigns an available aircraft/slot for this route.' : 'Final decision — the student sees it immediately.'} An instructor must be selected to approve.</div>
         </div>
       </div>
     `;
@@ -884,12 +955,22 @@ function renderPending(){
   el.querySelectorAll('.approve-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
-      const selectAssign = el.querySelector(`.assign-select[data-id="${id}"]`);
+      const req = requests.find(r => r.id === id);
       const selectInst = el.querySelector(`.assign-instructor-select[data-id="${id}"]`);
-      const assignValue = selectAssign.value;
       const instructorValue = selectInst.value;
-      if(!assignValue || !assignValue.includes('|')) return;
       if(!instructorValue){ alert('Please select an instructor before approving.'); return; }
+
+      let assignValue;
+      if(req.flightType === 'Cross Country'){
+        const options = buildAssignOptions(req);
+        if(!options.length){ alert('No aircraft/slot available for this route anymore.'); return; }
+        assignValue = options[0].value; // auto-assign first available within route capacity
+      } else {
+        const selectAssign = el.querySelector(`.assign-select[data-id="${id}"]`);
+        assignValue = selectAssign.value;
+      }
+      if(!assignValue || !assignValue.includes('|')) return;
+
       const [aircraft, slotOrReserve] = assignValue.split('|');
       const isReserve = slotOrReserve === 'reserve';
       const label = isReserve ? aircraft + ' (Reserve)' : aircraft + ' — ' + slotInfo(slotOrReserve).label;
@@ -915,12 +996,15 @@ function renderPending(){
 
 function renderAllRequests(){
   const el = document.getElementById('all-requests');
-  const sorted = [...requests].sort((a,b) => b.date.localeCompare(a.date));
+  // Approved-and-cleared entries stay hidden from this active queue (still intact in Firestore —
+  // still visible in the Archive and in the student's own My Requests).
+  const sorted = [...requests].filter(r => !(r.status === 'approved' && r.clearedFromQueue)).sort((a,b) => b.date.localeCompare(a.date));
   if(!sorted.length){ el.innerHTML = '<div class="empty">No requests yet.</div>'; return; }
   el.innerHTML = sorted.map(r => {
     const canPromote = r.status === 'approved' && r.isReserve && mainCountFor(r.date, r.aircraft) < CAP_MAIN;
     const canCancel = r.status === 'approved';
     const s = r.slot ? slotInfo(r.slot) : null;
+    const reassignInstOptions = instructors.map(inst => `<option value="${escapeHtml(inst)}" ${r.instructor === inst ? 'selected' : ''}>${escapeHtml(inst)}</option>`).join('');
     return `
     <details class="req-card">
       <summary class="req-header">
@@ -938,6 +1022,14 @@ function renderAllRequests(){
             <button class="btn small secondary copy-btn" data-text="${escapeHtml(generateClearanceText(r))}">Copy Clearance Text</button>
             ${canPromote ? `<button class="btn small warn-btn promote-btn" data-id="${r.id}">Promote to main slot</button>` : ''}
             ${canCancel ? `<button class="btn small grey-btn cancel-btn" data-id="${r.id}">Cancel flight</button>` : ''}
+            <button class="btn small grey-btn clear-queue-btn" data-id="${r.id}">Clear from queue</button>
+          </div>
+          <div class="admin-actions">
+            <select class="reassign-instructor-select" data-id="${r.id}">
+              <option value="">Change instructor…</option>
+              ${reassignInstOptions}
+            </select>
+            <button class="btn small secondary update-instructor-btn" data-id="${r.id}">Update instructor</button>
           </div>
         ` : ''}
       </div>
@@ -965,6 +1057,20 @@ function renderAllRequests(){
       const req = requests.find(r => r.id === btn.dataset.id);
       if(!confirm(`Cancel this flight for ${req.name} on ${req.date}? You can then promote a reserve if one is available.`)) return;
       await updateDoc(doc(db, 'requests', req.id), { status: 'cancelled', decidedAt: new Date().toISOString() });
+    });
+  });
+  el.querySelectorAll('.clear-queue-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if(!confirm('Clear this from the active queue? It stays fully intact in the Archive and the student\'s own request history — this only hides it from this list.')) return;
+      await updateDoc(doc(db, 'requests', btn.dataset.id), { clearedFromQueue: true });
+    });
+  });
+  el.querySelectorAll('.update-instructor-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const select = el.querySelector(`.reassign-instructor-select[data-id="${id}"]`);
+      if(!select.value) return;
+      await updateDoc(doc(db, 'requests', id), { instructor: select.value });
     });
   });
 }
@@ -1032,14 +1138,27 @@ function renderAogActiveList(){
   });
 }
 
+function currentWeekRange(){
+  const fmt = d => { const tz = d.getTimezoneOffset() * 60000; return new Date(d - tz).toISOString().slice(0,10); };
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 6);
+  return { start: fmt(start), end: fmt(end) };
+}
+
 function renderArchive(){
   const el = document.getElementById('archive-table');
   const monthFilter = document.getElementById('archive-month').value;
   let records = requests.filter(r => r.status === 'approved');
-  if(monthFilter){ records = records.filter(r => r.date.slice(0,7) === monthFilter); }
+  if(monthFilter){
+    records = records.filter(r => r.date.slice(0,7) === monthFilter);
+  } else {
+    const { start, end } = currentWeekRange();
+    records = records.filter(r => r.date >= start && r.date <= end);
+  }
   records = records.sort((a,b) => b.date.localeCompare(a.date));
   if(!records.length){
-    el.innerHTML = `<tr><td>${monthFilter ? 'No records for that month.' : 'No flight records yet.'}</td></tr>`;
+    el.innerHTML = `<tr><td>${monthFilter ? 'No records for that month.' : 'No approved flights in the last 7 days.'}</td></tr>`;
     return;
   }
   let html = '<tr><th>Date</th><th>Student Name</th><th>Aircraft</th><th>Instructor</th><th>Route</th></tr>';
@@ -1052,6 +1171,7 @@ function renderArchive(){
 function renderAll(){
   renderProfileUI();
   renderMyRequests();
+  renderFlightHistory();
   renderInlineAvailability();
   renderRouteAvailability();
 
@@ -1204,9 +1324,9 @@ document.getElementById('toggle-student-list').addEventListener('click', (e) => 
   e.preventDefault();
   document.getElementById('student-list-panel').classList.toggle('hidden');
 });
-document.getElementById('toggle-my-flights').addEventListener('click', (e) => {
+document.getElementById('toggle-flight-history').addEventListener('click', (e) => {
   e.preventDefault();
-  document.getElementById('my-flights-panel').classList.toggle('hidden');
+  document.getElementById('flight-history-panel').classList.toggle('hidden');
 });
 document.getElementById('aog-reason-select').addEventListener('change', (e) => {
   document.getElementById('aog-slots-field').classList.toggle('hidden', e.target.value !== 'MAINTENANCE');
