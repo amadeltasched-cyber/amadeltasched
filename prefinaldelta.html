@@ -22,12 +22,33 @@
   --bad-bg:#f8e6e6;
   --grey-bg:#eee;
   --bg:#fff;
+  --page-bg:#e9e9e9;
+  --muted:#666;
+  --muted-2:#888;
+  --input-border:#999;
+}
+
+body.dark-mode{
+  --ink:#e6e4e1;
+  --line:#444;
+  --grey:#555;
+  --grey-light:#242424;
+  --grey-bg:#2b2b2b;
+  --maroon-bg:#3a1e22;
+  --good-bg:#17301c;
+  --warn-bg:#332b12;
+  --bad-bg:#3a1c1c;
+  --bg:#1b1b1b;
+  --page-bg:#0e0e0e;
+  --muted:#aaa;
+  --muted-2:#999;
+  --input-border:#555;
 }
 *{box-sizing:border-box;}
 body{
   margin:0;
   font-family:'Times New Roman', Times, serif;
-  background:#e9e9e9;
+  background:var(--page-bg);
   color:var(--ink);
   padding:16px;
 }
@@ -60,7 +81,7 @@ body{
   padding:4px 12px;
   margin-bottom:10px;
   text-align:center;
-  color:#555;
+  color:var(--muted);
 }
 
 .tabs{display:flex;gap:2px;margin-bottom:14px;}
@@ -73,24 +94,24 @@ body{
 
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:0.85rem;font-weight:700;margin-bottom:5px;}
-.field input, .field select, .field textarea{width:100%;padding:9px 10px;border:1px solid #999;font-family:inherit;font-size:0.95rem;}
+.field input, .field select, .field textarea{width:100%;padding:9px 10px;border:1px solid var(--input-border);background:var(--bg);color:var(--ink);font-family:inherit;font-size:0.95rem;}
 .field textarea{resize:vertical;min-height:60px;}
 .checkbox-field{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
 .checkbox-field input{width:auto;}
 .checkbox-field label{font-size:0.88rem;font-weight:700;margin:0;}
 .cell-field{display:flex;align-items:center;gap:8px;}
-.cell-field .prefix{padding:9px 10px;border:1px solid #999;background:var(--grey-light);font-weight:700;}
+.cell-field .prefix{padding:9px 10px;border:1px solid var(--input-border);background:var(--grey-light);color:var(--ink);font-weight:700;}
 .cell-field input{flex:1;}
 
 .btn{padding:10px 18px;border:2px solid var(--maroon);background:var(--maroon);color:#fff;font-family:inherit;font-size:0.9rem;font-weight:700;cursor:pointer;}
 .btn:hover{background:var(--maroon-dark);}
-.btn.secondary{background:#fff;color:var(--maroon);}
+.btn.secondary{background:var(--bg);color:var(--maroon);}
 .btn.secondary:hover{background:var(--maroon-bg);}
 .btn.small{padding:6px 12px;font-size:0.82rem;}
 .btn:disabled{opacity:0.4;cursor:not-allowed;}
 .btn.approve{background:var(--good);border-color:var(--good);}
 .btn.approve:hover{background:#234f2b;}
-.btn.reject{background:#fff;color:var(--bad);border-color:var(--bad);}
+.btn.reject{background:var(--bg);color:var(--bad);border-color:var(--bad);}
 .btn.reject:hover{background:var(--bad-bg);}
 .btn.warn-btn{background:var(--warn);border-color:var(--warn);}
 .btn.grey-btn{background:#666;border-color:#666;}
@@ -110,7 +131,7 @@ body{
 details.req-card{padding:0;}
 details.req-card summary{cursor:pointer;padding:12px 14px;list-style:none;}
 details.req-card summary::-webkit-details-marker{display:none;}
-details.req-card summary::before{content:"\25B8  ";color:#888;}
+details.req-card summary::before{content:"\25B8  ";color:var(--muted-2);}
 details.req-card[open] summary::before{content:"\25BE  ";}
 details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid var(--line);margin-top:10px;padding-top:10px;}
 .archive-table th, .archive-table td{padding:12px 16px;}
@@ -118,19 +139,19 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
 .req-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
 .req-info{font-size:0.88rem;}
 .req-info b{font-size:0.95rem;}
-.req-meta{color:#666;font-size:0.8rem;margin-top:3px;}
+.req-meta{color:var(--muted);font-size:0.8rem;margin-top:3px;}
 .reserve-tag{display:inline-block;background:#e4dbf5;color:#4a2e7a;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:2px;margin-top:6px;}
 .status-tag{font-size:0.78rem;font-weight:700;padding:3px 9px;border-radius:2px;white-space:nowrap;}
 .status-tag.pending{background:var(--warn-bg);color:var(--warn);}
 .status-tag.approved{background:var(--good-bg);color:var(--good);}
 .status-tag.rejected{background:var(--bad-bg);color:var(--bad);}
-.status-tag.cancelled{background:var(--grey-bg);color:#555;}
+.status-tag.cancelled{background:var(--grey-bg);color:var(--muted);}
 .status-tag.declined{background:var(--bad-bg);color:var(--bad);}
 
 .decision-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--line);}
-.decision-note{font-size:0.78rem;color:#777;width:100%;}
+.decision-note{font-size:0.78rem;color:var(--muted);width:100%;}
 .admin-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;}
-.admin-actions select{padding:6px 8px;font-family:inherit;font-size:0.85rem;border:1px solid #999;}
+.admin-actions select{padding:6px 8px;font-family:inherit;font-size:0.85rem;border:1px solid var(--input-border);background:var(--bg);color:var(--ink);}
 
 .clearance-box{background:var(--grey-light);border:1px dashed var(--line);padding:10px;font-family:'Courier New',monospace;font-size:0.82rem;white-space:pre-wrap;margin-top:6px;}
 
@@ -140,7 +161,7 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
 .instructor-pill{background:var(--grey-light);border:1px solid var(--line);padding:4px 10px;font-size:0.85rem;font-weight:700;display:flex;align-items:center;gap:8px;}
 .instructor-pill span.remove-inst{color:var(--bad);cursor:pointer;font-weight:bold;}
 
-.empty{color:#888;font-size:0.88rem;padding:10px 0;}
+.empty{color:var(--muted-2);font-size:0.88rem;padding:10px 0;}
 .pin-gate{max-width:340px;margin:40px auto;text-align:center;}
 .pin-gate input{text-align:center;letter-spacing:0.2em;font-size:1.1rem;}
 
@@ -197,6 +218,7 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
       <div class="academy">DELTA AIR INTERNATIONAL AVIATION ACADEMY</div>
       <h1>Flight Booking System</h1>
     </div>
+    <button type="button" id="dark-mode-toggle" class="btn small secondary" style="margin-left:auto;">🌙 Dark mode</button>
   </div>
 
   <div id="conn-banner" class="conn-banner">Connecting to database…</div>
@@ -261,6 +283,12 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
         <div class="hidden" id="flight-history-panel">
           <div class="req-list" id="flight-history-list"></div>
         </div>
+        <div class="student-list-toggle-wrap">
+          <a href="#" id="toggle-cancelled-history" class="student-list-link">View cancelled/declined requests &rarr;</a>
+        </div>
+        <div class="hidden" id="cancelled-history-panel">
+          <div class="req-list" id="cancelled-history-list"></div>
+        </div>
       </div>
     </div>
 
@@ -318,13 +346,13 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
 
     <div class="panel requires-approved-profile hidden">
       <h2>My Requests</h2>
-      <p style="font-size:0.85rem;color:#666;">Pending requests only — once the dispatcher decides, it moves to your Request Archive below.</p>
+      <p style="font-size:0.85rem;color:var(--muted);">Pending requests only — once the dispatcher decides, it moves to your Request Archive below.</p>
       <div class="req-list" id="my-requests"></div>
     </div>
 
     <div class="panel requires-approved-profile hidden">
       <h2>Request Archive</h2>
-      <p style="font-size:0.85rem;color:#666;">Every decided request — approved, rejected, or cancelled.</p>
+      <p style="font-size:0.85rem;color:var(--muted);">Every decided request — approved, rejected, or cancelled.</p>
       <div class="req-list" id="request-archive-student"></div>
     </div>
 
@@ -401,6 +429,10 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
 
       <div class="panel">
         <h2>All Requests &amp; Flight Clearances</h2>
+        <div class="checkbox-field">
+          <input type="checkbox" id="show-cleared-toggle" />
+          <label for="show-cleared-toggle">Show items cleared from queue (still editable — approving/cancelling doesn't lock a flight forever)</label>
+        </div>
         <div class="req-list" id="all-requests"></div>
       </div>
 
@@ -861,29 +893,24 @@ function renderStudentRequestArchive(){
 function renderFlightHistory(){
   const el = document.getElementById('flight-history-list');
   if(!currentProfile || currentProfile.status !== 'approved'){ el.innerHTML = ''; return; }
-  const approvedOnly = requests.filter(r => r.studentProfileId === currentProfile.id && r.status === 'approved').sort((a,b) => b.date.localeCompare(a.date));
-  if(!approvedOnly.length){ el.innerHTML = '<div class="empty">No approved flights yet.</div>'; return; }
-  el.innerHTML = approvedOnly.map(r => {
-    const s = slotsDisplayFor(r);
-    return `
-    <details class="req-card">
-      <summary class="req-header">
-        <div class="req-info">
-          <b>${escapeHtml(r.date)}</b> — ${escapeHtml(r.aircraftType)} · ${escapeHtml(r.flightType)}
-          ${r.isReserve ? '<div class="reserve-tag">RESERVE</div>' : ''}
-        </div>
-        ${statusTagHtml(r.status)}
-      </summary>
-      <div class="req-details-body">
-        <div class="req-meta">
-          Route: ${escapeHtml(r.flightRoute || '-')}<br>
-          Aircraft: ${escapeHtml(r.aircraft || '-')}${s ? ' · ' + escapeHtml(s) : ''}<br>
-          Instructor: ${r.instructor ? escapeHtml(r.instructor) : 'None assigned'}
-        </div>
-        <div class="clearance-box">${escapeHtml(generateClearanceText(r))}</div>
-      </div>
-    </details>`;
-  }).join('');
+  // Only flights whose day has actually passed — an approved future flight can still be
+  // cancelled (weather, plans changing), so it doesn't count as "history" yet.
+  const today = todayStr();
+  const approvedOnly = requests
+    .filter(r => r.studentProfileId === currentProfile.id && r.status === 'approved' && r.date < today)
+    .sort((a,b) => b.date.localeCompare(a.date));
+  if(!approvedOnly.length){ el.innerHTML = '<div class="empty">No completed flights yet.</div>'; return; }
+  el.innerHTML = approvedOnly.map(studentReqCardHtml).join('');
+}
+
+function renderCancelledHistory(){
+  const el = document.getElementById('cancelled-history-list');
+  if(!currentProfile || currentProfile.status !== 'approved'){ el.innerHTML = ''; return; }
+  const decided = requests
+    .filter(r => r.studentProfileId === currentProfile.id && ['rejected','cancelled'].includes(r.status))
+    .sort((a,b) => b.date.localeCompare(a.date));
+  if(!decided.length){ el.innerHTML = '<div class="empty">No cancelled or declined requests.</div>'; return; }
+  el.innerHTML = decided.map(studentReqCardHtml).join('');
 }
 
 function renderScheduleBoard(containerEl, date, editable){
@@ -906,9 +933,8 @@ function renderScheduleBoard(containerEl, date, editable){
       const r = approved.find(x => x.aircraft === tail && !x.isReserve && occupiedSlotsOf(x).includes(slot.id));
       if(r){
         // Multi-slot (Cross Country) bookings aren't draggable — moving them would need to move the whole block.
-        const isMultiSlot = occupiedSlotsOf(r).length > 1;
-        const dragAttr = (editable && !isMultiSlot) ? `draggable="true" data-req-id="${r.id}"` : '';
-        cells += `<td class="slot-filled ${(editable && !isMultiSlot) ? 'draggable-cell' : ''}" ${dragAttr}>${escapeHtml(r.name)}<span class="instructor-line">${r.instructor ? escapeHtml(r.instructor) : 'Instructor TBD'}</span></td>`;
+        const dragAttr = editable ? `draggable="true" data-req-id="${r.id}"` : '';
+        cells += `<td class="slot-filled ${editable ? 'draggable-cell' : ''}" ${dragAttr}>${escapeHtml(r.name)}<span class="instructor-line">${r.instructor ? escapeHtml(r.instructor) : 'Instructor TBD'}</span></td>`;
       } else {
         const dropAttr = editable ? `data-aircraft="${tail}" data-slot="${slot.id}"` : '';
         cells += `<td class="slot-empty ${editable ? 'droppable-cell' : ''}" ${dropAttr}>Open</td>`;
@@ -943,6 +969,10 @@ function renderScheduleBoard(containerEl, date, editable){
   if(editable){ attachDragHandlers(containerEl, date); }
 }
 
+function slotTakenExcluding(date, aircraft, slotId, excludeReqId){
+  return requests.some(r => r.id !== excludeReqId && r.date === date && r.aircraft === aircraft && r.status === 'approved' && !r.isReserve && occupiedSlotsOf(r).includes(slotId));
+}
+
 function attachDragHandlers(containerEl, date){
   containerEl.querySelectorAll('[draggable="true"]').forEach(el => {
     el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', el.dataset.reqId); });
@@ -958,9 +988,24 @@ function attachDragHandlers(containerEl, date){
       if(!req) return;
       const targetAircraft = el.dataset.aircraft;
       const targetSlot = el.dataset.slot;
-      if(slotTaken(date, targetAircraft, targetSlot)){ alert('That slot is already taken.'); return; }
-      if(!confirm(`Move ${req.name} to ${targetAircraft} — ${slotInfo(targetSlot).label}?`)) return;
-      await updateDoc(doc(db, 'requests', req.id), { aircraft: targetAircraft, slot: targetSlot });
+      const duration = req.flightType === 'Cross Country' ? routeDuration(req.flightRoute) : 1;
+
+      // The dropped-on slot becomes the START of the flight's window — find the consecutive
+      // run of `duration` flyable slots beginning there, and confirm the whole run is open
+      // (ignoring the flight's own current slots, since it's just being moved).
+      const flyable = SLOTS.filter(s => !s.isLunch);
+      const startIdx = flyable.findIndex(s => s.id === targetSlot);
+      if(startIdx === -1 || startIdx + duration > flyable.length){
+        alert(`Not enough consecutive room starting here — this flight needs ${duration} consecutive slot(s).`);
+        return;
+      }
+      const windowSlots = flyable.slice(startIdx, startIdx + duration);
+      const windowIds = windowSlots.map(s => s.id);
+      const blocked = windowIds.some(id => slotTakenExcluding(date, targetAircraft, id, req.id) || aogBlocksSlot(date, targetAircraft, id));
+      if(blocked){ alert("That window isn't fully open on this aircraft."); return; }
+
+      if(!confirm(`Move ${req.name} to ${targetAircraft} — ${windowLabel(windowSlots)}?`)) return;
+      await updateDoc(doc(db, 'requests', req.id), { aircraft: targetAircraft, slots: windowIds, slot: null });
     });
   });
 }
@@ -1063,10 +1108,12 @@ function renderPending(){
 
 function renderAllRequests(){
   const el = document.getElementById('all-requests');
-  // Cleared entries (approved/rejected/cancelled) stay hidden from this active queue —
-  // still intact in Firestore, still visible in the Archive / student's own Request Archive.
+  const showCleared = document.getElementById('show-cleared-toggle').checked;
+  // Cleared entries (approved/rejected/cancelled) normally stay hidden from this active queue —
+  // still fully intact in Firestore, still visible in the Archive / student's own Request Archive.
+  // The "Show cleared" toggle brings them back here, fully editable, when needed.
   const sorted = [...requests]
-    .filter(r => r.status === 'pending' || !r.clearedFromQueue)
+    .filter(r => r.status === 'pending' || !r.clearedFromQueue || showCleared)
     .sort((a,b) => b.date.localeCompare(a.date));
   if(!sorted.length){ el.innerHTML = '<div class="empty">No requests yet.</div>'; return; }
   el.innerHTML = sorted.map(r => {
@@ -1082,6 +1129,7 @@ function renderAllRequests(){
         <div class="req-info">
           <b>${escapeHtml(r.name)}</b> — ${escapeHtml(r.license)} · ${escapeHtml(r.aircraftType)} · ${escapeHtml(r.date)}
           ${r.isReserve && r.status === 'approved' ? '<div class="reserve-tag">RESERVE</div>' : ''}
+          ${r.clearedFromQueue ? '<div class="reserve-tag" style="background:var(--grey-bg);color:var(--muted);">CLEARED</div>' : ''}
         </div>
         ${statusTagHtml(r.status)}
       </summary>
@@ -1104,7 +1152,10 @@ function renderAllRequests(){
         ` : ''}
         ${isTerminal ? `
           <div class="admin-actions">
-            <button class="btn small grey-btn clear-queue-btn" data-id="${r.id}">${r.status === 'approved' ? 'Clear from queue' : '🗑 Remove from list'}</button>
+            ${r.clearedFromQueue
+              ? `<button class="btn small secondary unclear-btn" data-id="${r.id}">Restore to queue</button>`
+              : `<button class="btn small grey-btn clear-queue-btn" data-id="${r.id}">${r.status === 'approved' ? 'Clear from queue' : '🗑 Remove from list'}</button>`
+            }
           </div>
         ` : ''}
       </div>
@@ -1140,6 +1191,11 @@ function renderAllRequests(){
     btn.addEventListener('click', async () => {
       if(!confirm('Remove this from the active list? It stays fully intact in the Archive/request history — this only hides it from this list.')) return;
       await updateDoc(doc(db, 'requests', btn.dataset.id), { clearedFromQueue: true });
+    });
+  });
+  el.querySelectorAll('.unclear-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await updateDoc(doc(db, 'requests', btn.dataset.id), { clearedFromQueue: false });
     });
   });
   el.querySelectorAll('.update-instructor-btn').forEach(btn => {
@@ -1249,6 +1305,7 @@ function renderAll(){
   renderProfileUI();
   renderMyRequests();
   renderFlightHistory();
+  renderCancelledHistory();
   renderStudentRequestArchive();
   renderInlineAvailability();
   renderRouteAvailability();
@@ -1409,6 +1466,10 @@ document.getElementById('toggle-flight-history').addEventListener('click', (e) =
   e.preventDefault();
   document.getElementById('flight-history-panel').classList.toggle('hidden');
 });
+document.getElementById('toggle-cancelled-history').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('cancelled-history-panel').classList.toggle('hidden');
+});
 document.getElementById('aog-reason-select').addEventListener('change', (e) => {
   document.getElementById('aog-slots-field').classList.toggle('hidden', e.target.value !== 'MAINTENANCE');
 });
@@ -1428,6 +1489,7 @@ document.getElementById('archive-show-all').addEventListener('click', () => {
   document.getElementById('archive-month').value = '';
   renderArchive();
 });
+document.getElementById('show-cleared-toggle').addEventListener('change', renderAllRequests);
 document.getElementById('download-schedule-student').addEventListener('click', () => {
   downloadScheduleImage(document.getElementById('schedule-board-student'), document.getElementById('schedule-date-student').value);
 });
@@ -1486,6 +1548,23 @@ document.getElementById('aog-aircraft-select').innerHTML = AIRCRAFT.map(t => `<o
 document.getElementById('aog-slots-checkboxes').innerHTML = SLOTS.filter(s => !s.isLunch).map(s =>
   `<label style="font-weight:400;font-size:0.85rem;"><input type="checkbox" value="${s.id}" style="width:auto;"/> ${s.label} (${s.time})</label>`
 ).join('');
+
+// Dark mode: manual toggle only, remembered across visits
+const DARK_MODE_KEY = 'amadelta-dark-mode';
+function applyDarkModeButtonLabel(){
+  const isDark = document.body.classList.contains('dark-mode');
+  document.getElementById('dark-mode-toggle').textContent = isDark ? '☀️ Light mode' : '🌙 Dark mode';
+}
+if(localStorage.getItem(DARK_MODE_KEY) === 'on'){
+  document.body.classList.add('dark-mode');
+}
+applyDarkModeButtonLabel();
+document.getElementById('dark-mode-toggle').addEventListener('click', () => {
+  document.body.classList.toggle('dark-mode');
+  localStorage.setItem(DARK_MODE_KEY, document.body.classList.contains('dark-mode') ? 'on' : 'off');
+  applyDarkModeButtonLabel();
+});
+
 loadMyProfilePointer();
 renderWeatherWidgets();
 </script>
