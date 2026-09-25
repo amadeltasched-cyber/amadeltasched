@@ -429,11 +429,16 @@ details.req-card .req-details-body{padding:0 14px 14px 14px;border-top:1px solid
 
       <div class="panel">
         <h2>All Requests &amp; Flight Clearances</h2>
-        <div class="checkbox-field">
-          <input type="checkbox" id="show-cleared-toggle" />
-          <label for="show-cleared-toggle">Show items cleared from queue (still editable — approving/cancelling doesn't lock a flight forever)</label>
+        <div class="student-list-toggle-wrap">
+          <a href="#" id="toggle-all-requests" class="student-list-link">View all requests &amp; clearances &rarr;</a>
         </div>
-        <div class="req-list" id="all-requests"></div>
+        <div class="hidden" id="all-requests-panel">
+          <div class="checkbox-field">
+            <input type="checkbox" id="show-cleared-toggle" />
+            <label for="show-cleared-toggle">Show items cleared from queue (still editable — approving/cancelling doesn't lock a flight forever)</label>
+          </div>
+          <div class="req-list" id="all-requests"></div>
+        </div>
       </div>
 
       <div class="panel">
@@ -617,12 +622,23 @@ async function autoExpireOldPending(){
   }
 }
 
+async function autoClearOldApproved(){
+  const cutoff = Date.now() - AUTO_EXPIRE_MS;
+  const stale = requests.filter(r => r.status === 'approved' && !r.clearedFromQueue && r.decidedAt && new Date(r.decidedAt).getTime() < cutoff);
+  for(const r of stale){
+    try{
+      await updateDoc(doc(db, 'requests', r.id), { clearedFromQueue: true });
+    }catch(e){ /* best-effort */ }
+  }
+}
+
 onSnapshot(requestsCol, snap => {
   requests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   firstRequestsSnap = false;
   setConnBanner(true, 'Connected — live sync active.');
   renderAll();
   autoExpireOldPending();
+  autoClearOldApproved();
 }, err => {
   console.error(err);
   setConnBanner(false, 'Could not connect to the database. Check your internet connection.');
@@ -871,6 +887,7 @@ function studentReqCardHtml(r){
           Aircraft: ${r.aircraft ? escapeHtml(r.aircraft) : 'Pending assignment'}${s ? ' · ' + escapeHtml(s) : ''}<br>
           Instructor: ${r.instructor ? escapeHtml(r.instructor) : 'None assigned'}
         </div>
+        ${r.status === 'rejected' && r.dispatcherRemark ? `<div class="req-meta" style="margin-top:6px;"><b>Dispatcher note:</b> ${escapeHtml(r.dispatcherRemark)}</div>` : ''}
         ${r.status === 'approved' ? `<div class="clearance-box">${escapeHtml(generateClearanceText(r))}</div>` : ''}
       </div>
     </details>`;
@@ -979,6 +996,11 @@ function attachDragHandlers(containerEl, date){
   containerEl.querySelectorAll('[draggable="true"]').forEach(el => {
     el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', el.dataset.reqId); });
   });
+  // Click a filled cell to change its instructor right from the published board —
+  // no need to hunt through the (possibly long) All Requests list.
+  containerEl.querySelectorAll('td.slot-filled[data-req-id]').forEach(cell => {
+    cell.addEventListener('click', () => openInlineInstructorEditor(cell, cell.dataset.reqId));
+  });
   containerEl.querySelectorAll('.droppable-cell').forEach(el => {
     el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
     el.addEventListener('dragleave', () => { el.classList.remove('drag-over'); });
@@ -1009,6 +1031,29 @@ function attachDragHandlers(containerEl, date){
       if(!confirm(`Move ${req.name} to ${targetAircraft} — ${windowLabel(windowSlots)}?`)) return;
       await updateDoc(doc(db, 'requests', req.id), { aircraft: targetAircraft, slots: windowIds, slot: null });
     });
+  });
+}
+
+function openInlineInstructorEditor(cell, reqId){
+  const req = requests.find(r => r.id === reqId);
+  if(!req) return;
+  const options = instructors.map(i => `<option value="${escapeHtml(i)}" ${req.instructor === i ? 'selected' : ''}>${escapeHtml(i)}</option>`).join('');
+  cell.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:4px;" onclick="event.stopPropagation()">
+      <select class="inline-instructor-select" style="width:100%;font-size:0.7rem;padding:2px;">${options}</select>
+      <div style="display:flex;gap:4px;justify-content:center;">
+        <button type="button" class="btn small inline-save-btn" style="padding:2px 6px;font-size:0.68rem;">Save</button>
+        <button type="button" class="btn small secondary inline-cancel-btn" style="padding:2px 6px;font-size:0.68rem;">✕</button>
+      </div>
+    </div>
+  `;
+  cell.removeAttribute('draggable');
+  const select = cell.querySelector('.inline-instructor-select');
+  cell.querySelector('.inline-save-btn').addEventListener('click', async () => {
+    await updateDoc(doc(db, 'requests', reqId), { instructor: select.value });
+  });
+  cell.querySelector('.inline-cancel-btn').addEventListener('click', () => {
+    renderAll(); // simplest way to restore the board to its normal rendered state
   });
 }
 
@@ -1102,8 +1147,13 @@ function renderPending(){
 
   el.querySelectorAll('.reject-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if(!confirm('Reject this request? This cannot be undone.')) return;
-      await updateDoc(doc(db, 'requests', btn.dataset.id), { status: 'rejected', decidedAt: new Date().toISOString() });
+      const remark = prompt('Reason for rejecting this request (shown to the student, optional):');
+      if(remark === null) return; // cancelled the prompt entirely
+      await updateDoc(doc(db, 'requests', btn.dataset.id), {
+        status: 'rejected',
+        decidedAt: new Date().toISOString(),
+        dispatcherRemark: remark.trim()
+      });
     });
   });
 }
@@ -1464,6 +1514,10 @@ document.getElementById('toggle-student-list').addEventListener('click', (e) => 
   e.preventDefault();
   document.getElementById('student-list-panel').classList.toggle('hidden');
 });
+document.getElementById('toggle-all-requests').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('all-requests-panel').classList.toggle('hidden');
+});
 document.getElementById('toggle-flight-history').addEventListener('click', (e) => {
   e.preventDefault();
   document.getElementById('flight-history-panel').classList.toggle('hidden');
@@ -1573,4 +1627,3 @@ renderWeatherWidgets();
 
 </body>
 </html>
-
