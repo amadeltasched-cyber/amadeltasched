@@ -1100,6 +1100,10 @@ function renderPending(){
           </select>
           ${assignControlHtml}
         </div>
+        <div class="field" style="margin-top:10px;margin-bottom:0;">
+          <label>Remarks (shown to the student if you reject)</label>
+          <textarea class="reject-remark-field" data-id="${r.id}" rows="2" placeholder="e.g. Aircraft already booked that day, please pick another date"></textarea>
+        </div>
         <div class="decision-row">
           <button class="btn approve approve-btn" data-id="${r.id}" ${disabledApprove ? 'disabled' : ''}>&#10003; Approve</button>
           <button class="btn reject reject-btn" data-id="${r.id}">&#10005; Reject</button>
@@ -1147,12 +1151,14 @@ function renderPending(){
 
   el.querySelectorAll('.reject-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
-      const remark = prompt('Reason for rejecting this request (shown to the student, optional):');
-      if(remark === null) return; // cancelled the prompt entirely
-      await updateDoc(doc(db, 'requests', btn.dataset.id), {
+      const id = btn.dataset.id;
+      const remarkField = el.querySelector(`.reject-remark-field[data-id="${id}"]`);
+      const remark = remarkField ? remarkField.value.trim() : '';
+      if(!confirm('Reject this request? This cannot be undone.')) return;
+      await updateDoc(doc(db, 'requests', id), {
         status: 'rejected',
         decidedAt: new Date().toISOString(),
-        dispatcherRemark: remark.trim()
+        dispatcherRemark: remark
       });
     });
   });
